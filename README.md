@@ -24,6 +24,10 @@ nothing itself.
 pnpm add strapi-plugin-publisher github:arinite-com/strapi-plugin-schedule-board
 ```
 
+It is not on npm. pnpm resolves that to a tarball from GitHub pinned to an exact commit in your
+lockfile, and builds it on install through its `prepare` script, so no credentials are involved and
+nothing has to be built by hand.
+
 Then enable both in `config/plugins.ts`:
 
 ```ts
