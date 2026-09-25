@@ -59,21 +59,48 @@ function labelOf(entry, documentId) {
   return field ? entry[field] : documentId;
 }
 
-// One read per content type rather than one per action: thirty scheduled posts across three types
-// cost three queries, not thirty.
+// i18n is a plugin like any other and may not be installed, in which case there is one locale and
+// nothing to distinguish, so a row never shows one.
+async function defaultLocaleOf(strapi) {
+  try {
+    const i18n = strapi.plugin('i18n');
+    const service = i18n && i18n.service('locales');
+    return service ? await service.getDefaultLocale() : null;
+  } catch {
+    return null;
+  }
+}
+
+// An entry is only identified by all three of these. The same document id means a different entry
+// in a different locale, and looking one up without its locale silently answers about another one.
+const keyOf = (action) => `${action.entitySlug}:${action.entityId}:${action.locale || ''}`;
+
+// What the job will actually do, which is not always what it says. Publisher skips a publish whose
+// entry is already live and unchanged since it went live, and skips an unpublish on something that
+// was never live, and then deletes the action either way. A row claiming "will publish" for one of
+// those is a promise nothing keeps.
+function outcomeOf(mode, state) {
+  if (mode === 'unpublish') return state.live ? 'unpublish' : 'none';
+  if (!state.live || state.modified) return 'publish';
+  return 'none';
+}
+
+// One read per content type and locale rather than one per action: thirty scheduled posts across
+// three types in one locale cost three queries, not thirty.
 async function describe(strapi, actions) {
-  const idsByType = new Map();
+  const groups = new Map();
   for (const action of actions) {
-    const ids = idsByType.get(action.entitySlug) || [];
-    ids.push(action.entityId);
-    idsByType.set(action.entitySlug, ids);
+    const groupKey = `${action.entitySlug}:${action.locale || ''}`;
+    const group = groups.get(groupKey) || { uid: action.entitySlug, locale: action.locale || undefined, ids: [] };
+    group.ids.push(action.entityId);
+    groups.set(groupKey, group);
   }
 
   const labels = new Map();
   const typeNames = new Map();
-  const live = new Set();
+  const states = new Map();
 
-  for (const [uid, ids] of idsByType) {
+  for (const { uid, locale, ids } of groups.values()) {
     // `entitySlug` is data, and the same registry that holds articles also holds the admin's own
     // types: users, roles, API tokens. Anyone who can create an action could point one at those and
     // have the board read them back. A board for scheduled content never looks outside content.
@@ -83,28 +110,33 @@ async function describe(strapi, actions) {
     typeNames.set(uid, (schema && schema.info && schema.info.displayName) || uid);
     if (!schema) continue;
 
-    // The draft always exists, so it is what the title comes from.
-    const drafts = await strapi.documents(uid).findMany({
-      filters: { documentId: { $in: ids } },
-      status: 'draft',
-    });
-    for (const entry of drafts) {
-      labels.set(`${uid}:${entry.documentId}`, labelOf(entry, entry.documentId));
-    }
+    // Omitting `locale` entirely is not the same as passing undefined to Strapi on every version,
+    // so the parameter is only added when there is one. No locale means the default one, which is
+    // also what an action carries when the install has no i18n at all.
+    const scope = { filters: { documentId: { $in: ids } } };
+    if (locale) scope.locale = locale;
 
-    // Whether a published version exists too, so the board can say where a job is taking the entry
-    // rather than only what it will do: "Draft, will publish" reads very differently from
-    // "Live, will come down".
-    const published = await strapi.documents(uid).findMany({
-      filters: { documentId: { $in: ids } },
-      status: 'published',
-    });
-    for (const entry of published) {
-      live.add(`${uid}:${entry.documentId}`);
+    // The draft always exists, so it is what the title comes from.
+    const drafts = await strapi.documents(uid).findMany({ ...scope, status: 'draft' });
+    const published = await strapi.documents(uid).findMany({ ...scope, status: 'published' });
+
+    const publishedById = new Map(published.map((entry) => [entry.documentId, entry]));
+
+    for (const draft of drafts) {
+      const key = `${uid}:${draft.documentId}:${locale || ''}`;
+      labels.set(key, labelOf(draft, draft.documentId));
+
+      // "Modified" is publisher's own test for whether a publish would do anything: the draft has
+      // moved on since the published version was written.
+      const live = publishedById.get(draft.documentId);
+      states.set(key, {
+        live: Boolean(live),
+        modified: Boolean(live && draft.updatedAt && live.updatedAt && draft.updatedAt > live.updatedAt),
+      });
     }
   }
 
-  return { labels, typeNames, live };
+  return { labels, typeNames, states };
 }
 
 export default {
@@ -141,20 +173,28 @@ export default {
         }
         const all = await strapi.documents(ACTION_UID).findMany({ sort: 'executeAt:asc' });
         const actions = all.filter(usable);
-        const { labels, typeNames, live } = await describe(strapi, actions);
+        const { labels, typeNames, states } = await describe(strapi, actions);
 
         ctx.body = {
           available: true,
-          data: actions.map((action) => ({
-            documentId: action.documentId,
-            executeAt: action.executeAt,
-            mode: action.mode,
-            entityId: action.entityId,
-            entitySlug: action.entitySlug,
-            contentType: typeNames.get(action.entitySlug) || action.entitySlug,
-            label: labels.get(`${action.entitySlug}:${action.entityId}`) || action.entityId,
-            live: live.has(`${action.entitySlug}:${action.entityId}`),
-          })),
+          // Sent once so a row can stay quiet about the ordinary case: a locale is worth showing
+          // when it is not the one everything is in anyway.
+          defaultLocale: await defaultLocaleOf(strapi),
+          data: actions.map((action) => {
+            const state = states.get(keyOf(action)) || { live: false, modified: false };
+            return {
+              documentId: action.documentId,
+              executeAt: action.executeAt,
+              mode: action.mode,
+              entityId: action.entityId,
+              entitySlug: action.entitySlug,
+              locale: action.locale || null,
+              contentType: typeNames.get(action.entitySlug) || action.entitySlug,
+              label: labels.get(keyOf(action)) || action.entityId,
+              live: state.live,
+              outcome: outcomeOf(action.mode, state),
+            };
+          }),
         };
       },
 

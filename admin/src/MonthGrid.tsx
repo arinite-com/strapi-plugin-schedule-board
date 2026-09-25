@@ -1,6 +1,6 @@
 import { Box, Button, Flex, Typography } from '@strapi/design-system';
 import * as React from 'react';
-import { dayKey, entryState, jobIntent, type QueueRow } from './use-queue';
+import { dayKey, entryState, jobIntent, showsLocale, type QueueRow } from './use-queue';
 
 // A month at a time, so "what goes out next week" is one glance rather than arithmetic over a list.
 // Weeks start on Monday, which is how a UK editorial week is read.
@@ -30,7 +30,20 @@ function daysOfMonth(month: Date) {
 
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-export function MonthGrid({ rows, onSelect }: { rows: QueueRow[]; onSelect: (row: QueueRow) => void }) {
+// Coloured by what the job will change, not by what it is called, so a job that will do nothing
+// reads as grey among the ones that will.
+const CELL_BACKGROUND = { publish: 'success100', unpublish: 'warning100', none: 'neutral150' } as const;
+const CELL_TEXT = { publish: 'success700', unpublish: 'warning700', none: 'neutral600' } as const;
+
+export function MonthGrid({
+  rows,
+  defaultLocale,
+  onSelect,
+}: {
+  rows: QueueRow[];
+  defaultLocale: string | null;
+  onSelect: (row: QueueRow) => void;
+}) {
   const [month, setMonth] = React.useState(() => new Date());
 
   const byDay = React.useMemo(() => {
@@ -114,11 +127,11 @@ export function MonthGrid({ rows, onSelect }: { rows: QueueRow[]; onSelect: (row
                     paddingTop={1}
                     paddingBottom={1}
                     hasRadius
-                    background={row.mode === 'unpublish' ? 'warning100' : 'success100'}
-                    title={`${timeOf(row.executeAt)} ${row.label}. ${entryState(row)}, ${jobIntent(row).toLowerCase()}. Click to reschedule.`}
+                    background={CELL_BACKGROUND[row.outcome]}
+                    title={`${timeOf(row.executeAt)} ${row.label}${showsLocale(row, defaultLocale) ? ` (${row.locale})` : ''}. ${entryState(row)}, ${jobIntent(row).toLowerCase()}. Click to reschedule.`}
                     style={{ border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%' }}
                   >
-                    <Typography variant="pi" textColor={row.mode === 'unpublish' ? 'warning700' : 'success700'} ellipsis>
+                    <Typography variant="pi" textColor={CELL_TEXT[row.outcome]} ellipsis>
                       {timeOf(row.executeAt)} {row.label}
                     </Typography>
                   </Box>

@@ -44,6 +44,33 @@ already.
 Scheduling itself stays publisher's, in the content manager, under publisher's own rules. This
 plugin only shows and edits the resulting queue.
 
+## What a row claims
+
+A row says where the entry stands and what running the job will actually change, as one phrase:
+"Draft, will publish", "Live, will unpublish", "Live, no change".
+
+The third one is not padding. Publisher deletes an action once its moment arrives whether or not it
+had anything to do, and it skips a publish whose entry is already live and unedited since, and an
+unpublish on something that was never live. Those jobs run, change nothing, and vanish. The board
+works out which ones they are by comparing the draft against the published version, greys them, and
+says why on hover, rather than promising a change that nothing will make.
+
+## Locales
+
+A job belongs to one locale, and so does the entry it names: the same document id is a different
+entry with a different title in each. Every lookup here carries the job's locale, the link to the
+entry carries it too, and a row names its locale when it is not the default one. On an install with
+one locale, or none, nothing changes and no row mentions a locale at all.
+
+## Tests
+
+`pnpm test`. No DOM and no running Strapi: the controllers run against a stubbed `strapi`, and the
+admin's pure helpers run on their own.
+
+They exist for the mistakes that have already been made once here, all of which were silent: a
+mutation going to the wrong API, a lookup forgetting its locale, a date keyed in UTC, a row
+promising a change nothing would make. Each of those has a test that fails if it comes back.
+
 ## Why it is a plugin and not a page
 
 It needs its own admin route. Publisher's action table is deliberately hidden from the content

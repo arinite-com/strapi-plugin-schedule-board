@@ -1,7 +1,16 @@
 import { Box, Button, EmptyStateLayout, Flex, IconButton, Table, Tbody, Td, Th, Thead, Tr, Typography } from '@strapi/design-system';
 import { Calendar, Pencil, Trash } from '@strapi/icons';
 import * as React from 'react';
-import { entryState, entryUrl, groupByDay, jobIntent, whenFromNow, type QueueRow } from './use-queue';
+import {
+  entryState,
+  entryUrl,
+  groupByDay,
+  jobIntent,
+  noChangeReason,
+  showsLocale,
+  whenFromNow,
+  type QueueRow,
+} from './use-queue';
 
 // The queue: everything still to come, grouped by day.
 //
@@ -11,21 +20,21 @@ import { entryState, entryUrl, groupByDay, jobIntent, whenFromNow, type QueueRow
 //
 // The wording matters more than it looks. A chip reading "Publish" beside a title is the same
 // shape as Strapi's own published state, so it reads as "this is published" when it means "this
-// will be published". Every row states the entry's state and the job's intent as one phrase:
-// "Draft, will publish" or "Live, will unpublish".
+// will be published". Every row states the entry's state and what running it will change, as one
+// phrase: "Draft, will publish", "Live, will unpublish", "Live, no change".
 
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
+const DOT_COLOUR = { publish: 'success500', unpublish: 'warning500', none: 'neutral400' } as const;
+
+// A job that will change nothing is greyed rather than hidden: it is still going to run and still
+// going to disappear afterwards, so the reader needs to see it, just not to expect anything of it.
 function Intent({ row }: { row: QueueRow }) {
-  const coming = row.mode !== 'unpublish';
+  const doesNothing = row.outcome === 'none';
   return (
-    <Flex gap={2} alignItems="center">
-      <Box
-        aria-hidden
-        style={{ width: 6, height: 6, borderRadius: 999 }}
-        background={coming ? 'success500' : 'warning500'}
-      />
-      <Typography variant="pi" textColor="neutral700">
+    <Flex gap={2} alignItems="center" title={doesNothing ? noChangeReason(row) : undefined}>
+      <Box aria-hidden style={{ width: 6, height: 6, borderRadius: 999 }} background={DOT_COLOUR[row.outcome]} />
+      <Typography variant="pi" textColor={doesNothing ? 'neutral500' : 'neutral700'}>
         {entryState(row)}, {jobIntent(row).toLowerCase()}
       </Typography>
     </Flex>
@@ -34,10 +43,12 @@ function Intent({ row }: { row: QueueRow }) {
 
 export function QueueTable({
   rows,
+  defaultLocale,
   onCancel,
   onEdit,
 }: {
   rows: QueueRow[];
+  defaultLocale: string | null;
   onCancel: (id: string) => void;
   onEdit: (row: QueueRow) => void;
 }) {
@@ -113,6 +124,7 @@ export function QueueTable({
                     </Typography>
                     <Typography variant="pi" textColor="neutral500">
                       {row.contentType}
+                      {showsLocale(row, defaultLocale) ? ` · ${row.locale}` : ''}
                     </Typography>
                   </Flex>
                 </Td>

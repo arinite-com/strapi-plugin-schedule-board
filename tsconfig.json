@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
@@ -14,6 +18,13 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["admin/src/**/*", "server/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "admin/src/**/*",
+    "server/**/*",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

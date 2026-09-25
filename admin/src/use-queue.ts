@@ -10,25 +10,43 @@ export type QueueRow = {
   mode: string;
   entityId: string;
   entitySlug: string;
+  locale: string | null;
   contentType: string;
   label: string;
   live: boolean;
+  // What running the job will actually change, decided on the server against the entry as it
+  // stands, not read off the job's own name.
+  outcome: 'publish' | 'unpublish' | 'none';
 };
 
 // What a job will DO, said as a future, because "Publish" on its own reads as a state and looks
 // exactly like Strapi's own published chip sitting next to a title.
-export const jobIntent = (row: QueueRow) => (row.mode === 'unpublish' ? 'Will unpublish' : 'Will publish');
+//
+// "no change" is the one that matters. Publisher deletes an action once its moment arrives whether
+// or not it had anything to do, so a job against an entry that is already where the job would put
+// it will run, change nothing, and disappear. Saying "will publish" there is a promise nobody keeps.
+export const jobIntent = (row: QueueRow) => {
+  if (row.outcome === 'none') return 'No change';
+  return row.outcome === 'unpublish' ? 'Will unpublish' : 'Will publish';
+};
+
+// Why a job is going to do nothing, for the row that says so.
+export const noChangeReason = (row: QueueRow) =>
+  row.mode === 'unpublish'
+    ? 'This entry is not live, so there is nothing to take down. The job will run and change nothing.'
+    : 'This entry is already live and has not been edited since, so there is nothing to publish. The job will run and change nothing.';
 
 // Where the entry stands right now, which is the other half of the sentence.
 export const entryState = (row: QueueRow) => (row.live ? 'Live' : 'Draft');
 
 // `available` is false when publisher is switched off, and the rows are then empty rather than
 // missing, so the page can say so instead of showing an error.
-type QueueResponse = { data?: QueueRow[]; available?: boolean };
+type QueueResponse = { data?: QueueRow[]; available?: boolean; defaultLocale?: string | null };
 
 export function useQueue() {
   const { get, del, put } = useFetchClient();
   const [rows, setRows] = React.useState<QueueRow[]>([]);
+  const [defaultLocale, setDefaultLocale] = React.useState<string | null>(null);
   // "unavailable" is its own state, not an error: publisher being switched off is a configuration
   // fact the page can explain, while an error screen would suggest something is broken.
   const [status, setStatus] = React.useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading');
@@ -37,6 +55,7 @@ export function useQueue() {
     try {
       const { data } = await get<QueueResponse>('/schedule-board/queue');
       setRows(data.data ?? []);
+      setDefaultLocale(data.defaultLocale ?? null);
       setStatus(data.available === false ? 'unavailable' : 'ready');
     } catch {
       setStatus('error');
@@ -63,8 +82,13 @@ export function useQueue() {
     [put, load],
   );
 
-  return { rows, status, reload: load, cancel, reschedule };
+  return { rows, defaultLocale, status, reload: load, cancel, reschedule };
 }
+
+// A locale is only worth showing when it is not the one everything is in anyway. On a single-locale
+// install this is never true and no row carries a locale at all.
+export const showsLocale = (row: QueueRow, defaultLocale: string | null) =>
+  Boolean(row.locale) && row.locale !== defaultLocale;
 
 // "in 3 days", "in 2 hours", "due now". A scheduled job is only interesting relative to now, and an
 // absolute timestamp alone makes the reader do the arithmetic.
@@ -106,5 +130,9 @@ export function groupByDay(rows: QueueRow[]) {
 }
 
 // Where the entry lives in the content manager, so a row can be opened rather than hunted for.
-export const entryUrl = (row: QueueRow) =>
-  `/admin/content-manager/collection-types/${row.entitySlug}/${row.entityId}`;
+// The locale has to travel with it, or the link opens the same document in whichever locale the
+// content manager happens to default to, which is a different entry with a different title.
+export const entryUrl = (row: QueueRow) => {
+  const path = `/admin/content-manager/collection-types/${row.entitySlug}/${row.entityId}`;
+  return row.locale ? `${path}?plugins[i18n][locale]=${encodeURIComponent(row.locale)}` : path;
+};

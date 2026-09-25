@@ -23,7 +23,7 @@ export default function ScheduleBoardPage() {
 // Publisher deletes an action once it has run, so both are lists of what is still to come. There is
 // deliberately no history: that would mean recording executed actions ourselves.
 function Board() {
-  const { rows, status, cancel, reschedule, reload } = useQueue();
+  const { rows, defaultLocale, status, cancel, reschedule, reload } = useQueue();
   const [editing, setEditing] = React.useState<QueueRow | null>(null);
 
   if (status === 'loading') return <Page.Loading />;
@@ -69,11 +69,11 @@ function Board() {
             <Tabs.Trigger value="calendar">Calendar</Tabs.Trigger>
           </Tabs.List>
           <Tabs.Content value="queue">
-            <QueueTable rows={rows} onCancel={cancel} onEdit={setEditing} />
+            <QueueTable rows={rows} defaultLocale={defaultLocale} onCancel={cancel} onEdit={setEditing} />
           </Tabs.Content>
           <Tabs.Content value="calendar">
             <Box paddingTop={4}>
-              <MonthGrid rows={rows} onSelect={setEditing} />
+              <MonthGrid rows={rows} defaultLocale={defaultLocale} onSelect={setEditing} />
             </Box>
           </Tabs.Content>
         </Tabs.Root>
