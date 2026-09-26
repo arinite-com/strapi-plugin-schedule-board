@@ -1,6 +1,6 @@
 {
   "name": "strapi-plugin-schedule-board",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A queue and a calendar for everything strapi-plugin-publisher is holding to publish later.",
   "license": "MIT",
   "keywords": [
@@ -54,9 +54,9 @@
     "watch:link": "strapi-plugin watch:link",
     "verify": "strapi-plugin verify",
     "typecheck": "tsc --noEmit",
-    "prepare": "strapi-plugin build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:dist": "strapi-plugin build && git diff --exit-code HEAD -- dist"
   },
   "devDependencies": {
     "@strapi/sdk-plugin": "^6.1.1",
@@ -82,5 +82,6 @@
   },
   "engines": {
     "node": ">=20.0.0 <=24.x.x"
-  }
+  },
+  "packageManager": "pnpm@10.17.0"
 }

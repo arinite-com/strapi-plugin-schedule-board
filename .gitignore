@@ -1,5 +1,5 @@
 node_modules/
-dist/
+# dist/ is committed on purpose: consumers install this from git and must not build it.
 .DS_Store
 *.log
 .env

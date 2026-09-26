@@ -24,9 +24,30 @@ nothing itself.
 pnpm add strapi-plugin-publisher github:arinite-com/strapi-plugin-schedule-board
 ```
 
-It is not on npm. pnpm resolves that to a tarball from GitHub pinned to an exact commit in your
-lockfile, and builds it on install through its `prepare` script, so no credentials are involved and
-nothing has to be built by hand.
+It is not on npm. pnpm resolves that to a tarball from GitHub, pinned to an exact commit in your
+lockfile. No credentials, and nothing is built on your machine: `dist/` is committed here.
+
+## Why the build is committed
+
+Installing this used to run `prepare`, which meant every consumer did a full install of this repo's
+dev tree and built it. That put an entire dev dependency graph between somebody else's deploy and a
+working CMS, and it broke one: pnpm 12 refuses any package published in the last 24 hours, this
+repo's dev tree had `vitest` a few hours old, and a production deploy failed on a package nobody had
+asked for. The consumer's own pnpm version did not even apply, because the nested install ran inside
+this directory.
+
+So `dist/` is in git and there is no `prepare`. Installing is a download. Nothing here runs on
+anybody else's build machine, and no devDependency of this repo can break their deploy.
+
+The cost is that the build has to be current when a release is tagged. `pnpm check:dist` rebuilds
+and fails if what is committed differs, so:
+
+```bash
+pnpm test && pnpm typecheck && pnpm check:dist    # before tagging
+```
+
+Developing it, run `pnpm build` yourself after changing anything under `admin/` or `server/`;
+installing no longer does it for you.
 
 Then enable both in `config/plugins.ts`:
 
