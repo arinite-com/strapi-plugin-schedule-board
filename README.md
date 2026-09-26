@@ -89,12 +89,21 @@ one locale, or none, nothing changes and no row mentions a locale at all.
 
 ## Tests
 
-`pnpm test`. No DOM and no running Strapi: the controllers run against a stubbed `strapi`, and the
-admin's pure helpers run on their own.
+`pnpm test`. No browser and no running Strapi: the controllers run against a stubbed `strapi`, the
+admin's pure helpers run on their own, and the two views render to static markup so their wording
+can be asserted.
 
 They exist for the mistakes that have already been made once here, all of which were silent: a
 mutation going to the wrong API, a lookup forgetting its locale, a date keyed in UTC, a row
-promising a change nothing would make. Each of those has a test that fails if it comes back.
+promising a change nothing would make. Each of those has a test that fails if it comes back, checked
+by reverting each fix and watching the suite go red.
+
+The render tests stub the design system rather than importing it. `@strapi/design-system` 2.x and
+several of its own dependencies publish CommonJS while declaring `"type": "module"`, which Node's
+ESM loader refuses; it only works inside Strapi's own Vite build. So these tests cover this plugin's
+logic and copy, which is what changes, and cannot catch misuse of a real design-system prop. When
+the components start passing a new colour or spacing token, check it against the published theme:
+an unknown token name fails silently rather than loudly.
 
 ## Why it is a plugin and not a page
 

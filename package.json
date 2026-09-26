@@ -1,6 +1,6 @@
 {
   "name": "strapi-plugin-schedule-board",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A queue and a calendar for everything strapi-plugin-publisher is holding to publish later.",
   "license": "MIT",
   "keywords": [
@@ -63,6 +63,7 @@
     "@strapi/strapi": "^5.53.0",
     "@strapi/typescript-utils": "^5.53.0",
     "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
